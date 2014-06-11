@@ -72,6 +72,8 @@ class Network(object):
     def __str__(self):
         return '{}/{}'.format(str(self._address), self._mask_length)
 
+    def __eq__(self, other):
+        return self._address == other.address and self._mask_length == other.mask_length
 
 if __name__ == '__main__':
     ip_address = IPv4Address('172.16.128.128')

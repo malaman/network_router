@@ -65,19 +65,5 @@ class MyTestCase(unittest.TestCase):
         self.assertFalse(net.is_public())
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 if __name__ == '__main__':
     unittest.main()
