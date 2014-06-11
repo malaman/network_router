@@ -8,6 +8,15 @@ class IPv4Address(object):
 
     @classmethod
     def _validate_ip(cls, ip_address):
+        """
+        Verifies correctness of ip_address according to IPv4 address format
+
+        Args:
+            ip_address: string or integer
+        Returns:
+            value1: representation of ip address in int format
+            value2: representation of ip address in string format
+        """
         if isinstance(ip_address, str):
             octets = ip_address.split('.')
             binary_octets = ['{0:08b}'.format(int(octet)) for octet in octets if cls._is_octet(octet)]
@@ -28,6 +37,14 @@ class IPv4Address(object):
 
     @classmethod
     def _is_octet(cls, octet):
+        """
+        Verifies if particular octet is in IPv4 address format
+
+        Args:
+            octet: integer or string
+        Returns:
+            True or raises IllegalArgumentException
+        """
         if isinstance(octet, int):
             octet = str(octet)
         if octet.isdigit():
@@ -36,23 +53,23 @@ class IPv4Address(object):
                 return True
         raise IllegalArgumentException
 
-    def to_string(self):
+    def __str__(self):
         return self._string_ip
 
-    def to_long(self):
+    def __int__(self):
         return self._int_ip
 
     def __eq__(self, other):
-        return self._int_ip == other.to_long()
+        return int(self) == int(other)
 
     def __gt__(self, other):
-        return self._int_ip > other.to_long()
+        return int(self) > int(other)
 
     def __lt__(self, other):
-        return self._int_ip < other.to_long()
+        return int(self) < int(other)
 
 
 if __name__ == '__main__':
     ip = IPv4Address('127.12.45.22')
-    print(ip.to_long())
-    print(ip.to_string())
+    print(int(ip))
+    print(ip)
