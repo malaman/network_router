@@ -1,6 +1,9 @@
 from IPv4Address import IPv4Address, IllegalArgumentException
 from Network import Network
 
+class RouteNotFoundException(Exception):
+    pass
+
 
 class Route(object):
     def __init__(self, network, gateway, interface_name, metric):
@@ -51,7 +54,7 @@ class Route(object):
     def __eq__(self, other):
         if self._gateway is None and other.gateway is None:
             return self._network == other.network and self.interface_name == other.interface_name \
-            and self._metric == other.metric
+                and self._metric == other.metric
         if self._gateway and other.gateway:
             return self._network == other.network and self.interface_name == other.interface_name \
                 and self._metric == other.metric and self._gateway == other.gateway
@@ -88,7 +91,7 @@ class Router(object):
                     longest_mask = route.network.mask_length
 
         if len(route_candidate_lst) == 0:
-            return None
+            raise RouteNotFoundException
         if len(route_candidate_lst) == 1:
             return route_candidate_lst[0]
 
@@ -112,5 +115,3 @@ if __name__ == '__main__':
 
     router = Router(routes)
     print(router.route_for_address(IPv4Address('10.123.1.1')))
-
-

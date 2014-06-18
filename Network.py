@@ -67,6 +67,8 @@ class Network(object):
         if (IPv4Address('172.15.255.255') < self._address < IPv4Address('172.32.0.0')) or \
                 (IPv4Address('192.167.255.255') < self._address < IPv4Address('192.169.0.0')):
             return False
+        if self._address > IPv4Address('223.255.255.255'):
+            return False
         return True
 
     def __str__(self):
@@ -91,10 +93,3 @@ if __name__ == '__main__':
     print(str(net.subnets[0]))
     print(str(net.subnets[1]))
     print(net.subnets[1].total_hosts)
-
-
-
-
-
-
-
