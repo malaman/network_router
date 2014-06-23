@@ -25,64 +25,39 @@ class IPv4Address(object):
         if isinstance(ip_address, str):
             return cls.str_to_int(ip_address), ip_address
         if isinstance(ip_address, int):
-            if ip_address < 0 or ip_address > 4294967295:
-                raise InvalidIpError
-            binary_str = '{0:032b}'.format(ip_address)
-            octets = []
-            binary_octets = []
-            for i in range(0, 32, 8):
-                octet = binary_str[i:i+8]
-                octets.append(str(int(octet, 2)))
-                binary_octets.append(octet)
-            if all(octet for octet in octets if cls._is_octet(octet)):
-                return ip_address, '.'.join(octets)
+            return ip_address, cls.int_to_str(ip_address)
         raise InvalidIpError
-
-    @staticmethod
-    def _is_octet(octet):
-        """
-        Verifies if particular octet is in IPv4 address format
-
-        Args:
-            octet: integer or string
-        Returns:
-            True or raises InvalidIpError
-        """
-        if isinstance(octet, int):
-            octet = str(octet)
-        if octet.isdigit():
-            int_octet = int(octet)
-            if 0 <= int_octet <= 255:
-                return True
-        raise InvalidIpError
-
 
     # int
     @classmethod
     def str_to_int(cls, ip):
         octets = ip.split('.')
-        binary_octets = ['{0:08b}'.format(int(octet)) for octet in octets if cls._is_octet(octet)]
-        return int(''.join(binary_octets), 2)
+        if len(octets) < 4:
+            raise InvalidIpError
+        int_octets = []
+        for index, octet in enumerate(octets):
+            int_octets.append(cls.__octet_to_int(octet) << (32 - (index + 1) * 8))
+        return sum(int_octets)
 
     # int
-    @staticmethod
-    def __octet_to_int(octet):
-        pass
+    @classmethod
+    def __octet_to_int(cls, octet):
+        if octet.isdigit():
+            int_octet = int(octet)
+            if 0 <= int_octet <= 255:
+                return int_octet
+        raise InvalidIpError
+
 
     # str
     @classmethod
     def int_to_str(cls, integer):
         if integer < 0 or integer > 4294967295:
             raise InvalidIpError
-        binary_str = '{0:032b}'.format(integer)
-        octets = []
-        binary_octets = []
+        octet_list = []
         for i in range(0, 32, 8):
-            octet = binary_str[i:i+8]
-            octets.append(str(int(octet, 2)))
-            binary_octets.append(octet)
-        if all(octet for octet in octets if cls._is_octet(octet)):
-            return integer, '.'.join(octets)
+            octet_list.insert(0, str((integer & 0xFF << i) >> i))
+        return '.'.join(octet_list)
 
     # int
     def __int__(self):
@@ -132,12 +107,15 @@ class Network(object):
     # void
     def __init__(self, ipv4address, int_mask_length):
         # raises ValueError, InvalidMaskError
-        self._mask = self._validate(int_mask_length)
-        self._mask_length = int_mask_length
-        self._address = IPv4Address(int(ipv4address) & self._mask)
+        if isinstance(ipv4address, IPv4Address):
+            self._mask = self._validate_mask(int_mask_length)
+            self._mask_length = int_mask_length
+            self._address = IPv4Address(int(ipv4address) & self._mask)
+        else:
+            raise ValueError
 
     @classmethod
-    def _validate(cls, mask_length):
+    def _validate_mask(cls, mask_length):
         if isinstance(mask_length, int):
             if 0 <= mask_length <= 32:
                 mask = (2 ** mask_length - 1) << (32-mask_length)
@@ -147,9 +125,10 @@ class Network(object):
     # bool
     def __contains__(self, ipv4address):
         # raises ValueError
-        result = int(ipv4address) & self._mask == self._address
-        if result:
-            return True
+        if isinstance(ipv4address, IPv4Address):
+            result = int(ipv4address) & self._mask == self._address
+            if result:
+                return True
         raise ValueError
 
     # IPv4Address
@@ -160,27 +139,35 @@ class Network(object):
     # IPv4Address
     @property
     def broadcast_address(self):
-        return IPv4Address((int(self._address) | self.wildcard))
+        return IPv4Address((int(self._address) | int(self.wildcard)))
 
     # IPv4Address
     @property
     def first_usable_address(self):
-        return IPv4Address(int(self._address)+1)
+        if self._mask_length < 31:
+            return IPv4Address(int(self._address)+1)
+        if self._mask_length == 31:
+            return None
+        return IPv4Address(int(self._address))
 
     # IPv4Address
     @property
     def last_usable_address(self):
-        return IPv4Address((int(self._address) | self.wildcard) - 1)
+        if self._mask_length < 31:
+            return IPv4Address((int(self._address) | int(self.wildcard) - 1))
+        if self._mask_length == 31:
+            return None
+        return IPv4Address(int(self._address))
 
     # IPv4Address
     @property
     def mask(self):
-        return self._mask
+        return IPv4Address(self._mask)
 
     # IPv4Address
     @property
     def wildcard(self):
-        return self._mask ^ 0xFFFFFFFF
+        return IPv4Address(self._mask ^ 0xFFFFFFFF)
 
     # int
     @property
@@ -190,17 +177,17 @@ class Network(object):
     # list of two subnets, or an empty list
     @property
     def subnets(self):
+        subnets_list = []
         if self._mask_length < 32:
             new_mask_length = self._mask_length + 1
-            subnets_list = [Network(int(self._address), new_mask_length)]
-            bit_setter = 1 << (32-new_mask_length)
-            subnets_list.append(Network(int(self._address) | bit_setter, new_mask_length))
-            return subnets_list
+            subnets_list = [Network(IPv4Address(int(self._address)), new_mask_length),
+                            Network(IPv4Address(int(self._address) | 1 << (32-new_mask_length)), new_mask_length)]
+        return subnets_list
 
     # int
     @property
     def total_hosts(self):
-        return 2 ** (32-self._mask_length) - 2
+        return 2 ** (32-self._mask_length)
 
     # bool
     @property
@@ -242,7 +229,7 @@ class Route(object):
         if ipv4_gateway is not None:
             self._gateway = IPv4Address(ipv4_gateway)
         else:
-            self._gateway = None
+            self._gateway = IPv4Address('0.0.0.0')
 
     @classmethod
     def _validate_route(cls, network, interface_name, metric):
@@ -274,7 +261,7 @@ class Route(object):
 
     # str
     def __repr__(self):
-        if self._gateway:
+        if int(self._gateway):
             return 'net: {}, gateway: {}, interface: {}, metric: {}'.format(self._network, self._gateway,
                                                                     self._interface_name, self._metric)
         else:
@@ -283,13 +270,8 @@ class Route(object):
 
     # bool
     def __eq__(self, route):
-        if self._gateway is None and route.gateway is None:
-            return self._network == route.network and self.interface_name == route.interface_name \
-                and self._metric == route.metric
-        if self._gateway and route.gateway:
-            return self._network == route.network and self.interface_name == route.interface_name \
-                and self._metric == route.metric and self._gateway == route.gateway
-        return False
+        return self._network == route.network and self.interface_name == route.interface_name \
+            and self._metric == route.metric and self._gateway == route.gateway
 
     # bool
     def __ne__(self, route):
@@ -312,27 +294,15 @@ class Router(object):
     # Route or None
     def route_for_address(self, ipv4address):
         route_candidate_lst = []
-        longest_mask = -1
-        for route in self._routes:
-            if route.network.address == int(ipv4address) & route.network.mask:
-                route_candidate_lst.append(route)
-                if route.network.mask_length > longest_mask:
-                    longest_mask = route.network.mask_length
-
+        route_candidate_lst = [route for route in self._routes
+                               if route.network.address == int(ipv4address) & int(route.network.mask)]
         if len(route_candidate_lst) == 0:
             return None
         if len(route_candidate_lst) == 1:
             return route_candidate_lst[0]
-
+        longest_mask = max(route_candidate_lst, key=lambda x: x.network.mask_length).network.mask_length
         route_candidate_lst = [route for route in route_candidate_lst if route.network.mask_length == longest_mask]
-        min_metric = route_candidate_lst[0].metric
-        min_route_index = 0
-        for index, route in enumerate(route_candidate_lst):
-            if min_metric > route.metric:
-                min_metric = route.metric
-                min_route_index = index
-        return route_candidate_lst[min_route_index]
-
+        return min(route_candidate_lst, key=lambda x: x.metric)
 
     # set
     @property
@@ -342,3 +312,24 @@ class Router(object):
     # void
     def remove_route(self, route):
         self._routes.remove(route)
+
+
+if __name__ == '__main__':
+    ip = IPv4Address('0.0.145.253')
+    print(ip)
+    print(ip.int_to_str(2131504406))
+    print(ip.str_to_int('127.2.3.255'))
+    net = Network(IPv4Address('255.1.1.1'),17)
+    print(net.first_usable_address)
+    print(net.mask)
+    routes = [Route(Network(IPv4Address('0.0.0.0'), 0), '192.168.0.1', 'en0', 10)]
+    routes.append(Route(Network(IPv4Address('192.168.0.0'), 24), None, 'en0', 10))
+    routes.append(Route(Network(IPv4Address('10.0.0.0'), 8), '10.123.0.1', 'en1', 10))
+    routes.append(Route(Network(IPv4Address('10.123.0.0'), 20), None, 'en1', 100))
+    routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en2', 101))
+    routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en3', 102))
+    routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en4', 103))
+
+    router = Router(routes)
+    print(router.routes)
+    print(router.route_for_address(IPv4Address('10.123.1.1')))

@@ -42,6 +42,9 @@ class MyTestCase(unittest.TestCase):
     def test_mask_length(self):
         net = Network(IPv4Address('192.168.255.128'), 25)
         self.assertEqual(net.mask_length, 25)
+    def test_network_mask(self):
+        net = Network(IPv4Address('1.1.1.1'), 18)
+        self.assertEqual(str(net.mask), '255.255.192.0')
 
     def test_subnets(self):
         net = Network(IPv4Address('192.168.255.128'), 25)

@@ -24,6 +24,14 @@ class MyTestCase(unittest.TestCase):
         self.assertRaises(InvalidIpError, IPv4Address, '127.12.45.22s')
         self.assertRaises(InvalidIpError, IPv4Address, '127.12.45.256')
         self.assertRaises(InvalidIpError, IPv4Address, '127,12.45.256')
+        self.assertRaises(InvalidIpError, IPv4Address, '145.253')
+
+
+    def test_create_with_invalid_type(self):
+        self.assertRaises(InvalidIpError, IPv4Address, ['127.12.45.1'])
+        self.assertRaises(InvalidIpError, IPv4Address, IPv4Address(0))
+
+
 
     def test_create_with_decimal(self):
         ip = IPv4Address('127.12.45.22')
@@ -92,18 +100,40 @@ class MyTestCase(unittest.TestCase):
     def test_broadcast_address(self):
         net = Network(IPv4Address('192.168.255.128'), 25)
         self.assertEqual(str(net.broadcast_address), '192.168.255.255')
+        net = Network(IPv4Address('192.168.255.0'), 30)
+        self.assertEqual(str(net.broadcast_address), '192.168.255.3')
+
 
     def test_first_usable_address(self):
         net = Network(IPv4Address('192.168.255.128'), 25)
         self.assertEqual(str(net.first_usable_address), '192.168.255.129')
+        net = Network(IPv4Address('0.0.0.0'), 0)
+        self.assertEqual(str(net.first_usable_address), '0.0.0.1')
+        net = Network(IPv4Address('10.10.10.0'), 30)
+        self.assertEqual(str(net.first_usable_address), '10.10.10.1')
+        net = Network(IPv4Address('10.10.10.0'), 31)
+        self.assertEqual(str(net.first_usable_address), 'None')
+        net = Network(IPv4Address('10.10.10.0'), 32)
+        self.assertEqual(str(net.first_usable_address), '10.10.10.0')
 
     def test_last_usable_address(self):
         net = Network(IPv4Address('192.168.255.128'), 25)
         self.assertEqual(str(net.last_usable_address), '192.168.255.254')
+        net = Network(IPv4Address('192.168.255.255'), 32)
+        net = Network(IPv4Address('0.0.0.0'), 0)
+        self.assertEqual(str(net.last_usable_address), '255.255.255.254')
+        net = Network(IPv4Address('10.10.10.0'), 30)
+        self.assertEqual(str(net.last_usable_address), '10.10.10.2')
+        net = Network(IPv4Address('10.10.10.0'), 31)
+        self.assertEqual(str(net.last_usable_address), 'None')
+        net = Network(IPv4Address('10.10.10.0'), 32)
+        self.assertEqual(str(net.last_usable_address), '10.10.10.0')
 
     def test_mask(self):
         net = Network(IPv4Address('192.168.255.128'), 25)
         self.assertEqual(net.mask, 0b11111111111111111111111110000000)
+        net = Network(IPv4Address('10.10.10.0'), 18)
+        self.assertEqual(net.mask, IPv4Address('255.255.192.0'))
 
 
     def test_mask_length(self):
@@ -114,10 +144,24 @@ class MyTestCase(unittest.TestCase):
         net = Network(IPv4Address('192.168.255.128'), 25)
         self.assertEqual(str(net.subnets[0]), '192.168.255.128/26')
         self.assertEqual(str(net.subnets[1]), '192.168.255.192/26')
+        net = Network(IPv4Address('192.168.255.128'), 30)
+        self.assertEqual(str(net.subnets[0]), '192.168.255.128/31')
+        self.assertEqual(str(net.subnets[1]), '192.168.255.130/31')
+        net = Network(IPv4Address('192.168.255.128'), 31)
+        self.assertEqual(str(net.subnets[0]), '192.168.255.128/32')
+        self.assertEqual(str(net.subnets[1]), '192.168.255.129/32')
+        net = Network(IPv4Address('192.168.255.128'), 32)
+        self.assertEqual(str(net.subnets), str([]))
 
     def test_total_hosts(self):
         net = Network(IPv4Address('192.168.255.128'), 25)
-        self.assertEqual(net.total_hosts, 126)
+        self.assertEqual(net.total_hosts, 128)
+        net = Network(IPv4Address('192.168.255.128'), 32)
+        self.assertEqual(net.total_hosts, 1)
+        net = Network(IPv4Address('192.168.255.128'), 31)
+        self.assertEqual(net.total_hosts, 2)
+        net = Network(IPv4Address('192.168.255.128'), 30)
+        self.assertEqual(net.total_hosts, 4)
 
     def test_is_public(self):
         net = Network(IPv4Address('192.168.255.128'), 25)
@@ -168,16 +212,22 @@ class MyTestCase(unittest.TestCase):
         routes = [Route(Network(IPv4Address('0.0.0.0'), 0), '192.168.0.1', 'en0', 10)]
         routes.append(Route(Network(IPv4Address('192.168.0.0'), 24), None, 'en0', 10))
         routes.append(Route(Network(IPv4Address('10.0.0.0'), 8), '10.123.0.1', 'en1', 10))
-        routes.append(Route(Network(IPv4Address('10.123.0.0'), 20), None, 'en1', 100))
-        routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en2', 101))
+        routes.append(Route(Network(IPv4Address('10.123.1.0'), 20), None, 'en1', 100))
         routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en3', 102))
         routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en4', 103))
+        routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en2', 101))
 
         router = Router(routes)
         self.assertEqual(str(router.route_for_address(IPv4Address('10.123.1.1'))),
                          'net: 10.123.1.0/24, interface: en2, metric: 101')
 
+        routes.append(Route(Network(IPv4Address('10.123.1.0'), 25), None, 'en2', 101))
+        self.assertEqual(str(router.route_for_address(IPv4Address('10.123.1.1'))),
+                         'net: 10.123.1.0/25, interface: en2, metric: 101')
 
+        routes.append(Route(Network(IPv4Address('10.123.1.0'), 25), None, 'en2', 10))
+        self.assertEqual(str(router.route_for_address(IPv4Address('10.123.1.1'))),
+                         'net: 10.123.1.0/25, interface: en2, metric: 10')
 
 if __name__ == '__main__':
     unittest.main()

@@ -34,6 +34,11 @@ class Network(object):
     def last_usable_address(self):
         return IPv4Address((int(self._address) | self._mask ^ 0xFFFFFFFF) - 1)
 
+    # IPv4Address
+    @property
+    def mask(self):
+        return IPv4Address(self._mask)
+
     @property
     def int_mask(self):
         return self._mask
