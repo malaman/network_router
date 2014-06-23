@@ -178,6 +178,8 @@ class MyTestCase(unittest.TestCase):
         self.assertFalse(net.public)
         net = Network(IPv4Address('182.20.255.128'), 25)
         self.assertTrue(net.public)
+        net = Network(IPv4Address('10.1.1.1'), 32)
+        self.assertFalse(net.public)
 
     def test_route_creation(self):
         route = Route(Network(IPv4Address('10.123.1.0'), 24), '192.168.0.1', 'en0', 10)

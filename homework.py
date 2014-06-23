@@ -1,5 +1,7 @@
 class InvalidIpError(ValueError):
     pass
+
+
 class InvalidMaskError(ValueError):
     pass
 
@@ -126,9 +128,7 @@ class Network(object):
     def __contains__(self, ipv4address):
         # raises ValueError
         if isinstance(ipv4address, IPv4Address):
-            result = int(ipv4address) & self._mask == self._address
-            if result:
-                return True
+            return int(ipv4address) & self._mask == self._address
         raise ValueError
 
     # IPv4Address
@@ -197,11 +197,8 @@ class Network(object):
                         Network(IPv4Address('172.16.0.0'), 12), Network(IPv4Address('192.168.0.0'), 16),
                         Network(IPv4Address('224.0.0.0'), 3)]
         for network in self.__class__.private_networks:
-            try:
-                if self._address in network:
-                    return False
-            except ValueError:
-                pass
+            if self._address in network:
+                return False
         return True
 
     # str
@@ -215,7 +212,6 @@ class Network(object):
     # bool
     def __ne__(self, network):
         return not self == network
-
 
 
 class Route(object):
