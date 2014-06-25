@@ -28,7 +28,6 @@ class IPv4Address(object):
             octets = [cls.__octet_to_int(octet) for octet in ip.split('.')]
         except (TypeError, ValueError):
             raise InvalidIpError
-
         if len(octets) < 4:
             raise InvalidIpError
         return (octets[0] << 24) + (octets[1] << 16) + (octets[2] << 8) + octets[3]
@@ -42,16 +41,13 @@ class IPv4Address(object):
                 return int_octet
         raise InvalidIpError
 
-
     # str
     @classmethod
     def int_to_str(cls, integer):
         if integer < 0 or integer > 0xFFFFFFFF:
             raise InvalidIpError
-        octet_list = []
-        for i in range(0, 32, 8):
-            octet_list.insert(0, str((integer & 0xFF << i) >> i))
-        return '.'.join(octet_list)
+        return '.'.join([str((integer & 0xFF000000) >> 24), str((integer & 0x00FF0000) >> 16),
+                         str((integer & 0x0000FF00) >> 8), str(integer & 0x000000FF)])
 
     # int
     def __int__(self):
@@ -309,17 +305,17 @@ if __name__ == '__main__':
     print(repr(ip))
     print(ip.int_to_str(2131504406))
     print(ip.str_to_int('127.2.3.255'))
-    # net = Network(IPv4Address('255.1.1.1'),17)
-    # print(net.first_usable_address)
-    # print(net.mask)
-    # routes = [Route(Network(IPv4Address('0.0.0.0'), 0), '192.168.0.1', 'en0', 10)]
-    # routes.append(Route(Network(IPv4Address('192.168.0.0'), 24), None, 'en0', 10))
-    # routes.append(Route(Network(IPv4Address('10.0.0.0'), 8), '10.123.0.1', 'en1', 10))
-    # routes.append(Route(Network(IPv4Address('10.123.0.0'), 20), None, 'en1', 100))
-    # routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en2', 101))
-    # routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en3', 102))
-    # routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en4', 103))
-    #
-    # router = Router(routes)
-    # print(router.routes)
-    # print(router.route_for_address(IPv4Address('10.123.1.1')))
+    net = Network(IPv4Address('255.1.1.1'),17)
+    print(net.first_usable_address)
+    print(net.mask)
+    routes = set([Route(Network(IPv4Address('0.0.0.0'), 0), '192.168.0.1', 'en0', 10)])
+    routes.add(Route(Network(IPv4Address('192.168.0.0'), 24), None, 'en0', 10))
+    routes.add(Route(Network(IPv4Address('10.0.0.0'), 8), '10.123.0.1', 'en1', 10))
+    routes.add(Route(Network(IPv4Address('10.123.0.0'), 20), None, 'en1', 100))
+    routes.add(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en2', 101))
+    routes.add(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en3', 102))
+    routes.add(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en4', 103))
+
+    router = Router(routes)
+    print(router.routes)
+    print(router.route_for_address(IPv4Address('10.123.1.1')))
