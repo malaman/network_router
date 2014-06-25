@@ -46,8 +46,10 @@ class IPv4Address(object):
     def int_to_str(cls, integer):
         if integer < 0 or integer > 0xFFFFFFFF:
             raise InvalidIpError
-        return '.'.join([str((integer & 0xFF000000) >> 24), str((integer & 0x00FF0000) >> 16),
-                         str((integer & 0x0000FF00) >> 8), str(integer & 0x000000FF)])
+        return '.'.join([str((integer & 0xFF000000) >> 24),
+                         str((integer & 0x00FF0000) >> 16),
+                         str((integer & 0x0000FF00) >> 8),
+                         str(integer  & 0x000000FF)])
 
     # int
     def __int__(self):
