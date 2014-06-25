@@ -155,13 +155,13 @@ class MyTestCase(unittest.TestCase):
 
     def test_total_hosts(self):
         net = Network(IPv4Address('192.168.255.128'), 25)
-        self.assertEqual(net.total_hosts, 128)
+        self.assertEqual(net.total_hosts, 126)
         net = Network(IPv4Address('192.168.255.128'), 32)
         self.assertEqual(net.total_hosts, 1)
         net = Network(IPv4Address('192.168.255.128'), 31)
-        self.assertEqual(net.total_hosts, 2)
+        self.assertEqual(net.total_hosts, 0)
         net = Network(IPv4Address('192.168.255.128'), 30)
-        self.assertEqual(net.total_hosts, 4)
+        self.assertEqual(net.total_hosts, 2)
 
     def test_is_public(self):
         net = Network(IPv4Address('192.168.255.128'), 25)
@@ -188,46 +188,46 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(str(route), 'net: 10.123.1.0/24, interface: en0, metric: 10')
 
     def test_router_creation(self):
-        routes = [Route(Network(IPv4Address('10.123.1.0'), 24), '192.168.0.1', 'en0', 10),
-                  Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en0', 10)]
+        routes = set([Route(Network(IPv4Address('10.123.1.0'), 24), '192.168.0.1', 'en0', 10),
+                  Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en0', 10)])
         router = Router(routes)
         self.assertEqual(1, 1)
 
     def test_add_route(self):
-        routes = [Route(Network(IPv4Address('10.123.1.0'), 24), '192.168.0.1', 'en0', 10),
-              Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en0', 10)]
+        routes = set([Route(Network(IPv4Address('10.123.1.0'), 24), '192.168.0.1', 'en0', 10),
+        Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en0', 10)])
         router = Router(routes)
         routes_quantity = len(router.routes)
-        router.routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en0', 10))
+        router.add_route(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en0', 11))
         routes_quantity2 = len(router.routes)
         self.assertEqual(routes_quantity2, routes_quantity+1)
 
     def test_remove_route(self):
-        routes = [Route(Network(IPv4Address('10.123.1.0'), 24), '192.168.0.1', 'en0', 10),
+        routes = set([Route(Network(IPv4Address('10.123.1.0'), 24), '192.168.0.1', 'en0', 10),
               Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en0', 10),
-              Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en0', 100)]
+              Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en0', 100)])
         router = Router(routes)
         router.routes.remove(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en0', 100))
         self.assertEqual(len(router.routes), 2)
 
     def test_route_for_address(self):
-        routes = [Route(Network(IPv4Address('0.0.0.0'), 0), '192.168.0.1', 'en0', 10)]
-        routes.append(Route(Network(IPv4Address('192.168.0.0'), 24), None, 'en0', 10))
-        routes.append(Route(Network(IPv4Address('10.0.0.0'), 8), '10.123.0.1', 'en1', 10))
-        routes.append(Route(Network(IPv4Address('10.123.1.0'), 20), None, 'en1', 100))
-        routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en3', 102))
-        routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en4', 103))
-        routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en2', 101))
+        routes = set([Route(Network(IPv4Address('0.0.0.0'), 0), '192.168.0.1', 'en0', 10)])
+        routes.add(Route(Network(IPv4Address('192.168.0.0'), 24), None, 'en0', 10))
+        routes.add(Route(Network(IPv4Address('10.0.0.0'), 8), '10.123.0.1', 'en1', 10))
+        routes.add(Route(Network(IPv4Address('10.123.1.0'), 20), None, 'en1', 100))
+        routes.add(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en3', 102))
+        routes.add(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en4', 103))
+        routes.add(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en2', 101))
 
         router = Router(routes)
         self.assertEqual(str(router.route_for_address(IPv4Address('10.123.1.1'))),
                          'net: 10.123.1.0/24, interface: en2, metric: 101')
 
-        routes.append(Route(Network(IPv4Address('10.123.1.0'), 25), None, 'en2', 101))
+        routes.add(Route(Network(IPv4Address('10.123.1.0'), 25), None, 'en2', 101))
         self.assertEqual(str(router.route_for_address(IPv4Address('10.123.1.1'))),
                          'net: 10.123.1.0/25, interface: en2, metric: 101')
 
-        routes.append(Route(Network(IPv4Address('10.123.1.0'), 25), None, 'en2', 10))
+        routes.add(Route(Network(IPv4Address('10.123.1.0'), 25), None, 'en2', 10))
         self.assertEqual(str(router.route_for_address(IPv4Address('10.123.1.1'))),
                          'net: 10.123.1.0/25, interface: en2, metric: 10')
 

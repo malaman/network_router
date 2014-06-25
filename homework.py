@@ -11,35 +11,27 @@ class IPv4Address(object):
     def __init__(self, address):
         # address is str or int
         # raises InvalidIpError
-        (self._int_ip, self._string_ip) = self._validate_ip(address)
-
-    @classmethod
-    def _validate_ip(cls, ip_address):
-        """
-        Verifies correctness of ip_address according to IPv4 address format
-
-        Args:
-            ip_address: string or integer
-        Returns:
-            value1: representation of ip address in int format
-            value2: representation of ip address in string format
-        """
-        if isinstance(ip_address, str):
-            return cls.str_to_int(ip_address), ip_address
-        if isinstance(ip_address, int):
-            return ip_address, cls.int_to_str(ip_address)
+        if isinstance(address, str):
+            self._int_ip = self.str_to_int(address)
+            self._string_ip = address
+            return
+        if isinstance(address, int):
+            self._int_ip = address
+            self._string_ip = self.int_to_str(address)
+            return
         raise InvalidIpError
 
     # int
     @classmethod
     def str_to_int(cls, ip):
-        octets = ip.split('.')
+        try:
+            octets = [cls.__octet_to_int(octet) for octet in ip.split('.')]
+        except (TypeError, ValueError):
+            raise InvalidIpError
+
         if len(octets) < 4:
             raise InvalidIpError
-        int_octets = []
-        for index, octet in enumerate(octets):
-            int_octets.append(cls.__octet_to_int(octet) << (32 - (index + 1) * 8))
-        return sum(int_octets)
+        return (octets[0] << 24) + (octets[1] << 16) + (octets[2] << 8) + octets[3]
 
     # int
     @classmethod
@@ -54,7 +46,7 @@ class IPv4Address(object):
     # str
     @classmethod
     def int_to_str(cls, integer):
-        if integer < 0 or integer > 4294967295:
+        if integer < 0 or integer > 0xFFFFFFFF:
             raise InvalidIpError
         octet_list = []
         for i in range(0, 32, 8):
@@ -110,19 +102,14 @@ class Network(object):
     def __init__(self, ipv4address, int_mask_length):
         # raises ValueError, InvalidMaskError
         if isinstance(ipv4address, IPv4Address):
-            self._mask = self._validate_mask(int_mask_length)
-            self._mask_length = int_mask_length
-            self._address = IPv4Address(int(ipv4address) & self._mask)
+            if isinstance(int_mask_length, int) and 0 <= int_mask_length <= 32:
+                self._mask = (2 ** int_mask_length - 1) << (32-int_mask_length)
+                self._mask_length = int_mask_length
+                self._address = IPv4Address(int(ipv4address) & self._mask)
+            else:
+                raise InvalidMaskError
         else:
             raise ValueError
-
-    @classmethod
-    def _validate_mask(cls, mask_length):
-        if isinstance(mask_length, int):
-            if 0 <= mask_length <= 32:
-                mask = (2 ** mask_length - 1) << (32-mask_length)
-                return mask
-        raise InvalidMaskError
 
     # bool
     def __contains__(self, ipv4address):
@@ -187,7 +174,12 @@ class Network(object):
     # int
     @property
     def total_hosts(self):
-        return 2 ** (32-self._mask_length)
+        if self._mask_length < 31:
+            return 2 ** (32-self._mask_length) - 2
+        if self._mask_length == 31:
+            return 0
+        if self._mask_length == 32:
+            return 1
 
     # bool
     @property
@@ -215,6 +207,9 @@ class Network(object):
 
 
 class Route(object):
+    __repr_string = 'net: {}, gateway: {}, interface: {}, metric: {}'
+    __repr_string_wo_gateway = 'net: {}, interface: {}, metric: {}'
+
     # void
     def __init__(self, network, ipv4_gateway, str_interface_name, int_metric):
         # raises ValueError
@@ -232,7 +227,7 @@ class Route(object):
         if isinstance(network, Network)  \
                 and isinstance(metric, int) and isinstance(interface_name, str):
             if metric >= 0:
-                return True
+                return
         raise ValueError
 
     # IPv4Address
@@ -258,16 +253,13 @@ class Route(object):
     # str
     def __repr__(self):
         if int(self._gateway):
-            return 'net: {}, gateway: {}, interface: {}, metric: {}'.format(self._network, self._gateway,
-                                                                    self._interface_name, self._metric)
-        else:
-            return 'net: {}, interface: {}, metric: {}'.format(self._network, self._interface_name, self._metric)
-
+            return self.__repr_string.format(self._network, self._gateway, self._interface_name, self._metric)
+        return self.__repr_string_wo_gateway.format(self._network, self._interface_name, self._metric)
 
     # bool
     def __eq__(self, route):
-        return self._network == route.network and self.interface_name == route.interface_name \
-            and self._metric == route.metric and self._gateway == route.gateway
+        return self._network == route.network and self._interface_name == route.interface_name \
+             and self._gateway == route.gateway and self._metric == route.metric
 
     # bool
     def __ne__(self, route):
@@ -275,23 +267,25 @@ class Route(object):
 
     # int
     def __hash__(self):
-        return super().__hash__()
+        return hash((int(self._network.address), int(self._network.mask), int(self._gateway),
+        self._interface_name, self._metric))
 
 
 class Router(object):
     # void
     def __init__(self, routes):
-        self._routes = routes
+        if isinstance(routes, set):
+            self._routes = routes
+            return
+        raise ValueError
 
     # void
     def add_route(self, route):
-        self._routes.append(route)
+        self._routes.add(route)
 
     # Route or None
     def route_for_address(self, ipv4address):
-        route_candidate_lst = []
-        route_candidate_lst = [route for route in self._routes
-                               if route.network.address == int(ipv4address) & int(route.network.mask)]
+        route_candidate_lst = [route for route in self._routes if ipv4address in route.network]
         if len(route_candidate_lst) == 0:
             return None
         if len(route_candidate_lst) == 1:
@@ -311,21 +305,21 @@ class Router(object):
 
 
 if __name__ == '__main__':
-    ip = IPv4Address('0.0.145.253')
-    print(ip)
+    ip = IPv4Address('1.1.1.1')
+    print(repr(ip))
     print(ip.int_to_str(2131504406))
     print(ip.str_to_int('127.2.3.255'))
-    net = Network(IPv4Address('255.1.1.1'),17)
-    print(net.first_usable_address)
-    print(net.mask)
-    routes = [Route(Network(IPv4Address('0.0.0.0'), 0), '192.168.0.1', 'en0', 10)]
-    routes.append(Route(Network(IPv4Address('192.168.0.0'), 24), None, 'en0', 10))
-    routes.append(Route(Network(IPv4Address('10.0.0.0'), 8), '10.123.0.1', 'en1', 10))
-    routes.append(Route(Network(IPv4Address('10.123.0.0'), 20), None, 'en1', 100))
-    routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en2', 101))
-    routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en3', 102))
-    routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en4', 103))
-
-    router = Router(routes)
-    print(router.routes)
-    print(router.route_for_address(IPv4Address('10.123.1.1')))
+    # net = Network(IPv4Address('255.1.1.1'),17)
+    # print(net.first_usable_address)
+    # print(net.mask)
+    # routes = [Route(Network(IPv4Address('0.0.0.0'), 0), '192.168.0.1', 'en0', 10)]
+    # routes.append(Route(Network(IPv4Address('192.168.0.0'), 24), None, 'en0', 10))
+    # routes.append(Route(Network(IPv4Address('10.0.0.0'), 8), '10.123.0.1', 'en1', 10))
+    # routes.append(Route(Network(IPv4Address('10.123.0.0'), 20), None, 'en1', 100))
+    # routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en2', 101))
+    # routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en3', 102))
+    # routes.append(Route(Network(IPv4Address('10.123.1.0'), 24), None, 'en4', 103))
+    #
+    # router = Router(routes)
+    # print(router.routes)
+    # print(router.route_for_address(IPv4Address('10.123.1.1')))
