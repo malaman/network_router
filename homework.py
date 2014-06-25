@@ -181,9 +181,9 @@ class Network(object):
     @property
     def public(self):
         if self.__class__.private_networks is None:
-            self.__class__.private_networks = [Network(IPv4Address('10.0.0.0'), 8), Network(IPv4Address('127.0.0.0'), 8),
-                        Network(IPv4Address('172.16.0.0'), 12), Network(IPv4Address('192.168.0.0'), 16),
-                        Network(IPv4Address('224.0.0.0'), 3)]
+            self.__class__.private_networks = [Network(IPv4Address('10.0.0.0'), 8),
+                        Network(IPv4Address('127.0.0.0'), 8), Network(IPv4Address('172.16.0.0'), 12),
+                        Network(IPv4Address('192.168.0.0'), 16), Network(IPv4Address('224.0.0.0'), 3)]
         for network in self.__class__.private_networks:
             if self._address in network:
                 return False
@@ -249,8 +249,10 @@ class Route(object):
     # str
     def __repr__(self):
         if int(self._gateway):
-            return self.__repr_string.format(self._network, self._gateway, self._interface_name, self._metric)
-        return self.__repr_string_wo_gateway.format(self._network, self._interface_name, self._metric)
+            format_params = (self._network, self._gateway, self._interface_name, self._metric)
+            return self.__repr_string.format(*format_params)
+        format_params = self._network, self._interface_name, self._metric
+        return self.__repr_string_wo_gateway.format(*format_params)
 
     # bool
     def __eq__(self, route):
