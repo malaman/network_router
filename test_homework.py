@@ -43,12 +43,27 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(str(ip), '0.0.0.0')
 
         ip = IPv4Address(4294967295)
-        self.assertEqual(int(ip), 4294967295)
+        self.assertEqual(int(ip), 0xFFFFFFFF)
         self.assertEqual(str(ip), '255.255.255.255')
 
     def test_create_with_invalid_decimal(self):
         self.assertRaises(InvalidIpError, IPv4Address, -1)
         self.assertRaises(InvalidIpError, IPv4Address, 4294967296)
+        self.assertRaises(InvalidIpError, IPv4Address, 0xFFFFFFFF1)
+        self.assertRaises(InvalidIpError, IPv4Address, 1.0)
+
+    def test_create_with_invalid_str(self):
+        self.assertRaises(InvalidIpError, IPv4Address, '1.-0.1.2')
+        self.assertRaises(InvalidIpError, IPv4Address, '1')
+        self.assertRaises(InvalidIpError, IPv4Address, '1...')
+        self.assertRaises(InvalidIpError, IPv4Address, '255.255.0.')
+        self.assertRaises(InvalidIpError, IPv4Address, '.255.0.')
+        self.assertRaises(InvalidIpError, IPv4Address, IPv4Address(0))
+        self.assertRaises(InvalidIpError, IPv4Address, '123')
+        self.assertRaises(InvalidIpError, IPv4Address, '123')
+        self.assertRaises(InvalidIpError, IPv4Address, '255.255.255.255.255')
+        self.assertRaises(InvalidIpError, IPv4Address, '255.255.255..255')
+
 
     def test_eq(self):
         self.assertEqual(IPv4Address('127.12.45.22'), IPv4Address(2131504406))

@@ -16,8 +16,8 @@ class IPv4Address(object):
             self._string_ip = address
             return
         if isinstance(address, int):
-            self._int_ip = address
             self._string_ip = self.int_to_str(address)
+            self._int_ip = address
             return
         raise InvalidIpError
 
@@ -28,7 +28,7 @@ class IPv4Address(object):
             octets = [cls.__octet_to_int(octet) for octet in ip.split('.')]
         except (TypeError, ValueError):
             raise InvalidIpError
-        if len(octets) < 4:
+        if len(octets) != 4:
             raise InvalidIpError
         return (octets[0] << 24) + (octets[1] << 16) + (octets[2] << 8) + octets[3]
 
